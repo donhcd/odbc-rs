@@ -78,12 +78,21 @@ fn test_direct_select() {
     let stmt = Statement::with_parent(&conn).unwrap();
 
     let mut stmt = match stmt.exec_direct("SELECT TITLE, YEAR FROM MOVIES ORDER BY YEAR")
-        .unwrap() {
+              .unwrap() {
         Data(stmt) => stmt,
         NoData(_) => panic!("SELECT statement did not return result set!"),
     };
 
-    assert_eq!(stmt.num_result_cols().unwrap(), 2);
+    let num_cols = stmt.num_result_cols().unwrap();
+    assert_eq!(num_cols, 2);
+    println!("going to start getting descriptions");
+    for i in 0..num_cols {
+        let i = i + 1;
+        println!("trying column {}", i);
+        println!("[{}] column description: {:?}",
+                 i,
+                 stmt.describe_col(i as usize).unwrap());
+    }
 
     #[derive(PartialEq, Debug)]
     struct Movie {
@@ -94,9 +103,9 @@ fn test_direct_select() {
     let mut actual = Vec::new();
     while let Some(mut cursor) = stmt.fetch().unwrap() {
         actual.push(Movie {
-            title: cursor.get_data(1).unwrap().unwrap(),
-            year: cursor.get_data(2).unwrap().unwrap(),
-        })
+                        title: cursor.get_data(1).unwrap().unwrap(),
+                        year: cursor.get_data(2).unwrap().unwrap(),
+                    })
     }
 
     let check = actual ==
@@ -116,23 +125,35 @@ fn test_direct_select() {
 
 #[test]
 fn reuse_statement() {
-    let env = Environment::new().unwrap().set_odbc_version_3().unwrap();
-    let conn = DataSource::with_parent(&env).unwrap().connect("TestDataSource", "", "").unwrap();
+    let env = Environment::new()
+        .unwrap()
+        .set_odbc_version_3()
+        .unwrap();
+    let conn = DataSource::with_parent(&env)
+        .unwrap()
+        .connect("TestDataSource", "rwoollen", "n8dC63emBah5")
+        .unwrap();
+    Statement::with_parent(&conn)
+        .unwrap()
+        .exec_direct("USE TEST_DB")
+        .unwrap();
     let stmt = Statement::with_parent(&conn).unwrap();
 
-    let stmt = match stmt.exec_direct("CREATE TABLE STAGE (A VARCHAR, B VARCHAR);").unwrap() {
+
+    let stmt = match stmt.exec_direct("CREATE TABLE STAGE (A VARCHAR, B VARCHAR);")
+              .unwrap() {
         Data(stmt) => stmt.close_cursor().unwrap(), //A result set has been returned, we need to close it.
         NoData(stmt) => stmt,
     };
     let stmt = match stmt.exec_direct("INSERT INTO STAGE (A, B) VALUES ('Hello', 'World');")
-        .unwrap() {
+              .unwrap() {
         Data(stmt) => stmt.close_cursor().unwrap(),
         NoData(stmt) => stmt,
     };
     if let Data(mut stmt) = stmt.exec_direct("SELECT A, B FROM STAGE;").unwrap() {
         {
             let mut cursor = stmt.fetch().unwrap().unwrap();
-            assert_eq!(cursor.get_data::<String>(1).unwrap().unwrap(),"Hello");
+            assert_eq!(cursor.get_data::<String>(1).unwrap().unwrap(), "Hello");
             assert_eq!(cursor.get_data::<String>(2).unwrap().unwrap(), "World");
         }
         let stmt = stmt.close_cursor().unwrap();

@@ -16,7 +16,7 @@ default = []
 travis = []
 
 [dependencies]
-odbc-sys = "0.2.8"
+odbc-sys = { git = "https://github.com/donhcd/odbc-sys.git", rev = "d62f90b" }
 log = "0.3.7"
 
 [dev-dependencies]

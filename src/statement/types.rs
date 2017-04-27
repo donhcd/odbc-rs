@@ -64,3 +64,11 @@ unsafe impl FixedSizedType for f64 {
         ffi::SQL_C_DOUBLE
     }
 }
+
+#[derive(Debug)]
+pub struct ColumnDescription {
+    pub name: String,
+    pub data_type: ffi::SqlDataType,
+    pub decimal_digits: usize,
+    pub nullable: ffi::SqlNullability,
+}

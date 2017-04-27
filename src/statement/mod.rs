@@ -1,3 +1,4 @@
+use std::ffi::CString;
 
 mod types;
 mod input;
@@ -88,7 +89,9 @@ impl<'a, 'b> Statement<'a, 'b, Allocated, NoResult> {
     ///
     /// `SQLExecDirect` is the fastest way to submit an SQL statement for one-time execution.
     pub fn exec_direct(mut self, statement_text: &str) -> Result<ResultSetState<'a, 'b, Executed>> {
-        if self.raii.exec_direct(statement_text).into_result(&self)? {
+        if self.raii
+               .exec_direct(statement_text)
+               .into_result(&self)? {
             Ok(ResultSetState::Data(Statement::with_raii(self.raii)))
         } else {
             Ok(ResultSetState::NoData(Statement::with_raii(self.raii)))
@@ -105,13 +108,17 @@ impl<'a, 'b, S> Statement<'a, 'b, S, HasResult> {
         self.raii.num_result_cols().into_result(self)
     }
 
+    pub fn describe_col(&self, i: usize) -> Result<types::ColumnDescription> {
+        self.raii.describe_col(i).into_result(self)
+    }
+
     /// Fetches the next rowset of data from the result set and returns data for all bound columns.
     pub fn fetch<'c>(&'c mut self) -> Result<Option<Cursor<'c, 'a, 'b, S>>> {
         if self.raii.fetch().into_result(self)? {
             Ok(Some(Cursor {
-                stmt: self,
-                buffer: [0u8; 512],
-            }))
+                        stmt: self,
+                        buffer: [0u8; 512],
+                    }))
         } else {
             Ok(None)
         }
@@ -172,16 +179,59 @@ impl Raii<ffi::Stmt> {
         }
     }
 
+    fn describe_col(&self, num: usize) -> Return<types::ColumnDescription> {
+        let col_name_buffer_len: ffi::SQLSMALLINT = 256;
+        let col_name = CString::new(Vec::with_capacity(col_name_buffer_len as usize))
+            .expect("there's no reason why this would error")
+            .into_raw();
+        let mut name_length: ffi::SQLSMALLINT = 0;
+        let mut data_type: ffi::SqlDataType = ffi::SQL_UNKNOWN_TYPE; // dummy data to overwrite
+        let mut col_size: ffi::SQLULEN = 0;
+        let mut decimal_digits: ffi::SQLSMALLINT = 0;
+        let mut nullable: ffi::SqlNullability = ffi::SQL_NULLABLE; // dummy data to overwrite
+        let res = unsafe {
+            ffi::SQLDescribeCol(self.handle(),
+                                num as ffi::SQLUSMALLINT,
+                                col_name as *mut ffi::SQLCHAR,
+                                col_name_buffer_len,
+                                &mut name_length as *mut ffi::SQLSMALLINT,
+                                &mut data_type as *mut ffi::SqlDataType,
+                                &mut col_size as *mut ffi::SQLULEN,
+                                &mut decimal_digits as *mut ffi::SQLSMALLINT,
+                                &mut nullable as *mut ffi::SqlNullability)
+        };
+        let col_desc = match res {
+            SQL_SUCCESS |
+            SQL_SUCCESS_WITH_INFO => {
+                types::ColumnDescription {
+                    name: unsafe { CString::from_raw(col_name) }
+                        .into_string()
+                        .expect("column name has valid unicode data"),
+                    data_type: data_type,
+                    decimal_digits: decimal_digits as usize,
+                    nullable: nullable,
+                }
+            }
+            SQL_ERROR => return Return::Error,
+            r => panic!("SQLDescribeCol returned unexpected result: {:?}", r),
+        };
+        match res {
+            SQL_SUCCESS => Return::Success(col_desc),
+            SQL_SUCCESS_WITH_INFO => Return::Success(col_desc),
+            _ => unreachable!(),
+        }
+    }
+
     fn exec_direct(&mut self, statement_text: &str) -> Return<bool> {
         let length = statement_text.len();
         if length > ffi::SQLINTEGER::max_value() as usize {
             panic!("Statement text too long");
         }
         match unsafe {
-            ffi::SQLExecDirect(self.handle(),
-                               statement_text.as_ptr(),
-                               length as ffi::SQLINTEGER)
-        } {
+                  ffi::SQLExecDirect(self.handle(),
+                                     statement_text.as_ptr(),
+                                     length as ffi::SQLINTEGER)
+              } {
             ffi::SQL_SUCCESS => Return::Success(true),
             ffi::SQL_SUCCESS_WITH_INFO => Return::SuccessWithInfo(true),
             ffi::SQL_ERROR => Return::Error,
