@@ -82,9 +82,16 @@ pub fn get_diag_rec(handle_type: ffi::HandleType,
         ffi::SQL_NO_DATA => None,
         ffi::SQL_SUCCESS_WITH_INFO => Some(result),
         ffi::SQL_ERROR => {
-            panic!("SQLGetDiagRec returned SQL_ERROR. RecNumber={}, BufferLength={} ...???",
-                   record_number,
-                   ffi::SQL_MAX_MESSAGE_LENGTH);
+            println!("SQLGetDiagRec returned SQL_ERROR. HandleType={:?}, Handle={:?}, RecNumber={}, SQLState={:?}, NativeErrorPtr={:?}, MessageText={:?}, BufferLength={}, TextLength={:?}...???",
+                     handle_type,
+                     handle,
+                     record_number,
+                     result.state.as_mut_ptr(),
+                     &mut result.native_error as *mut ffi::SQLINTEGER,
+                     result.message.as_mut_ptr(),
+                     ffi::SQL_MAX_MESSAGE_LENGTH,
+                     &mut result.message_length as *mut ffi::SQLSMALLINT);
+            return None;
             if record_number > 0 {
                 panic!("SQLGetDiagRec returned SQL_ERROR")
             } else {

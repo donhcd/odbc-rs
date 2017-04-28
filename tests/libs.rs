@@ -1,4 +1,6 @@
 extern crate odbc;
+use std::ptr::null_mut;
+
 use odbc::*;
 
 #[test]
@@ -73,12 +75,33 @@ fn test_connection_string() {
 
 #[test]
 fn test_direct_select() {
-    let env = Environment::new().unwrap().set_odbc_version_3().unwrap();
-    let conn = DataSource::with_parent(&env).unwrap().connect("TestDataSource", "", "").unwrap();
+    set_connection_pooling(ffi::SQL_CP_ONE_PER_DRIVER).expect("to be able to set connection pooling");
+    let env = Environment::new()
+        .unwrap()
+        .set_odbc_version_3()
+        .unwrap();
+    let conn = DataSource::with_parent(&env)
+        .unwrap()
+        .connect("TestDataSource", "rwoollen", "n8dC63emBah5")
+        .unwrap();
+
+    // Statement::with_parent(&conn)           a
+    //     .unwrap()
+    //     .exec_direct("ALTER warehouse DEMO_WH resume")
+    //     .unwrap();
+    // Statement::with_parent(&conn)
+    //     .unwrap()
+    //     .exec_direct("USE warehouse DEMO_WH")
+    //     .unwrap();
+    Statement::with_parent(&conn)
+        .unwrap()
+        .exec_direct("USE TEST_DB")
+        .unwrap();
+
     let stmt = Statement::with_parent(&conn).unwrap();
 
     let mut stmt = match stmt.exec_direct("SELECT TITLE, YEAR FROM MOVIES ORDER BY YEAR")
-        .unwrap() {
+              .unwrap() {
         Data(stmt) => stmt,
         NoData(_) => panic!("SELECT statement did not return result set!"),
     };
@@ -94,9 +117,9 @@ fn test_direct_select() {
     let mut actual = Vec::new();
     while let Some(mut cursor) = stmt.fetch().unwrap() {
         actual.push(Movie {
-            title: cursor.get_data(1).unwrap().unwrap(),
-            year: cursor.get_data(2).unwrap().unwrap(),
-        })
+                        title: cursor.get_data(1).unwrap().unwrap(),
+                        year: cursor.get_data(2).unwrap().unwrap(),
+                    })
     }
 
     let check = actual ==
@@ -116,23 +139,30 @@ fn test_direct_select() {
 
 #[test]
 fn reuse_statement() {
-    let env = Environment::new().unwrap().set_odbc_version_3().unwrap();
-    let conn = DataSource::with_parent(&env).unwrap().connect("TestDataSource", "", "").unwrap();
+    let env = Environment::new()
+        .unwrap()
+        .set_odbc_version_3()
+        .unwrap();
+    let conn = DataSource::with_parent(&env)
+        .unwrap()
+        .connect("TestDataSource", "", "")
+        .unwrap();
     let stmt = Statement::with_parent(&conn).unwrap();
 
-    let stmt = match stmt.exec_direct("CREATE TABLE STAGE (A VARCHAR, B VARCHAR);").unwrap() {
+    let stmt = match stmt.exec_direct("CREATE TABLE STAGE (A VARCHAR, B VARCHAR);")
+              .unwrap() {
         Data(stmt) => stmt.close_cursor().unwrap(), //A result set has been returned, we need to close it.
         NoData(stmt) => stmt,
     };
     let stmt = match stmt.exec_direct("INSERT INTO STAGE (A, B) VALUES ('Hello', 'World');")
-        .unwrap() {
+              .unwrap() {
         Data(stmt) => stmt.close_cursor().unwrap(),
         NoData(stmt) => stmt,
     };
     if let Data(mut stmt) = stmt.exec_direct("SELECT A, B FROM STAGE;").unwrap() {
         {
             let mut cursor = stmt.fetch().unwrap().unwrap();
-            assert_eq!(cursor.get_data::<String>(1).unwrap().unwrap(),"Hello");
+            assert_eq!(cursor.get_data::<String>(1).unwrap().unwrap(), "Hello");
             assert_eq!(cursor.get_data::<String>(2).unwrap().unwrap(), "World");
         }
         let stmt = stmt.close_cursor().unwrap();
@@ -144,15 +174,23 @@ fn reuse_statement() {
 
 #[test]
 fn execution_with_parameter() {
-    let env = Environment::new().unwrap().set_odbc_version_3().unwrap();
-    let conn = DataSource::with_parent(&env).unwrap().connect("TestDataSource", "", "").unwrap();
+    let env = Environment::new()
+        .unwrap()
+        .set_odbc_version_3()
+        .unwrap();
+    let conn = DataSource::with_parent(&env)
+        .unwrap()
+        .connect("TestDataSource", "", "")
+        .unwrap();
     let stmt = Statement::with_parent(&conn).unwrap();
     let param = 1968;
     let stmt = stmt.bind_parameter(1, &param).unwrap();
 
-    if let Data(mut stmt) = stmt.exec_direct("SELECT TITLE FROM MOVIES WHERE YEAR = ?").unwrap() {
+    if let Data(mut stmt) = stmt.exec_direct("SELECT TITLE FROM MOVIES WHERE YEAR = ?")
+           .unwrap() {
         let mut cursor = stmt.fetch().unwrap().unwrap();
-        assert_eq!(cursor.get_data::<String>(1).unwrap().unwrap(), "2001: A Space Odyssey");
+        assert_eq!(cursor.get_data::<String>(1).unwrap().unwrap(),
+                   "2001: A Space Odyssey");
     } else {
         panic!("SELECT statement returned no result set")
     };
@@ -160,10 +198,17 @@ fn execution_with_parameter() {
 
 #[test]
 fn prepared_execution() {
-    let env = Environment::new().unwrap().set_odbc_version_3().unwrap();
-    let conn = DataSource::with_parent(&env).unwrap().connect("TestDataSource", "", "").unwrap();
+    let env = Environment::new()
+        .unwrap()
+        .set_odbc_version_3()
+        .unwrap();
+    let conn = DataSource::with_parent(&env)
+        .unwrap()
+        .connect("TestDataSource", "", "")
+        .unwrap();
     let stmt = Statement::with_parent(&conn).unwrap();
-    let stmt = stmt.prepare("SELECT TITLE FROM MOVIES WHERE YEAR = ?").unwrap();
+    let stmt = stmt.prepare("SELECT TITLE FROM MOVIES WHERE YEAR = ?")
+        .unwrap();
 
     fn execute_query<'a>(year: u16,
                          expected: &str,
@@ -194,12 +239,16 @@ fn prepared_execution() {
 fn list_drivers() {
     let environment = Environment::new().unwrap();
     let environment = environment.set_odbc_version_3().unwrap();
-    let drivers = environment.drivers()
+    let drivers = environment
+        .drivers()
         .expect("Drivers can be iterated over");
     println!("{:?}", drivers);
 
     let expected = ["PostgreSQL ANSI", "PostgreSQL Unicode", "SQLite", "SQLite3"];
-    assert!(drivers.iter().map(|d| &d.description).eq(expected.iter()));
+    assert!(drivers
+                .iter()
+                .map(|d| &d.description)
+                .eq(expected.iter()));
 }
 
 #[cfg_attr(not(feature = "travis"), ignore)]
@@ -207,7 +256,8 @@ fn list_drivers() {
 fn list_data_sources() {
     let environment = Environment::new().unwrap();
     let environment = environment.set_odbc_version_3().unwrap();
-    let sources = environment.data_sources()
+    let sources = environment
+        .data_sources()
         .expect("Data sources can be iterated over");
     println!("{:?}", sources);
 
@@ -227,7 +277,8 @@ fn list_data_sources() {
 fn list_user_data_sources() {
     let environment = Environment::new().unwrap();
     let environment = environment.set_odbc_version_3().unwrap();
-    let sources = environment.user_data_sources()
+    let sources = environment
+        .user_data_sources()
         .expect("Data sources can be iterated over");
     println!("{:?}", sources);
 
@@ -247,7 +298,8 @@ fn list_user_data_sources() {
 fn list_system_data_sources() {
     let environment = Environment::new().unwrap();
     let environment = environment.set_odbc_version_3().unwrap();
-    let sources = environment.system_data_sources()
+    let sources = environment
+        .system_data_sources()
         .expect("Data sources can be iterated over");
     println!("{:?}", sources);
 
