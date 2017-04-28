@@ -88,7 +88,9 @@ impl<'a, 'b> Statement<'a, 'b, Allocated, NoResult> {
     ///
     /// `SQLExecDirect` is the fastest way to submit an SQL statement for one-time execution.
     pub fn exec_direct(mut self, statement_text: &str) -> Result<ResultSetState<'a, 'b, Executed>> {
-        if self.raii.exec_direct(statement_text).into_result(&self)? {
+        if self.raii
+               .exec_direct(statement_text)
+               .into_result(&self)? {
             Ok(ResultSetState::Data(Statement::with_raii(self.raii)))
         } else {
             Ok(ResultSetState::NoData(Statement::with_raii(self.raii)))
@@ -109,9 +111,9 @@ impl<'a, 'b, S> Statement<'a, 'b, S, HasResult> {
     pub fn fetch<'c>(&'c mut self) -> Result<Option<Cursor<'c, 'a, 'b, S>>> {
         if self.raii.fetch().into_result(self)? {
             Ok(Some(Cursor {
-                stmt: self,
-                buffer: [0u8; 512],
-            }))
+                        stmt: self,
+                        buffer: [0u8; 512],
+                    }))
         } else {
             Ok(None)
         }
@@ -178,10 +180,10 @@ impl Raii<ffi::Stmt> {
             panic!("Statement text too long");
         }
         match unsafe {
-            ffi::SQLExecDirect(self.handle(),
-                               statement_text.as_ptr(),
-                               length as ffi::SQLINTEGER)
-        } {
+                  ffi::SQLExecDirect(self.handle(),
+                                     statement_text.as_ptr(),
+                                     length as ffi::SQLINTEGER)
+              } {
             ffi::SQL_SUCCESS => Return::Success(true),
             ffi::SQL_SUCCESS_WITH_INFO => Return::SuccessWithInfo(true),
             ffi::SQL_ERROR => Return::Error,

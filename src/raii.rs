@@ -61,4 +61,3 @@ impl Raii<ffi::Env> {
         }
     }
 }
-

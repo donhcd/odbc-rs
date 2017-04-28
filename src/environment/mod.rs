@@ -45,20 +45,19 @@ impl Environment<NoVersion> {
     /// };
     /// ```
     pub fn new() -> std::result::Result<Environment<NoVersion>, EnvAllocError> {
-
         match unsafe { Raii::new() } {
             Return::Success(env) => {
                 Ok(Environment {
-                    raii: env,
-                    state: PhantomData,
-                })
+                       raii: env,
+                       state: PhantomData,
+                   })
             }
             Return::SuccessWithInfo(env) => {
                 warn!("{}", env.get_diag_rec(1).unwrap());
                 Ok(Environment {
-                    raii: env,
-                    state: PhantomData,
-                })
+                       raii: env,
+                       state: PhantomData,
+                   })
             }
             Return::Error => Err(EnvAllocError),
         }
@@ -80,8 +79,8 @@ impl Environment<NoVersion> {
     pub fn set_odbc_version_3(mut self) -> Result<Environment<Version3>> {
         self.raii.set_odbc_version_3().into_result(&self)?;
         Ok(Environment {
-            raii: self.raii,
-            state: PhantomData,
-        })
+               raii: self.raii,
+               state: PhantomData,
+           })
     }
 }

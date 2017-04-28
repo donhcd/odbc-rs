@@ -114,7 +114,7 @@ impl Raii<ffi::Stmt> {
                         } else {
                             Return::SuccessWithInfo(Some(from_utf8(&buffer[..(indicator as
                                                                        usize)])
-                                .unwrap()))
+                                                                 .unwrap()))
                         }
                     }
                 }
@@ -151,8 +151,8 @@ impl Raii<ffi::Stmt> {
                         Return::Success(None)
                     } else {
                         Return::Success(Some(from_utf8(&buffer[..(indicator as usize)])
-                            .unwrap()
-                            .to_owned()))
+                                                 .unwrap()
+                                                 .to_owned()))
                     }
                 }
                 ffi::SQL_SUCCESS_WITH_INFO => {
@@ -174,7 +174,7 @@ impl Raii<ffi::Stmt> {
                                                       ffi::SQL_C_CHAR,
                                                       heap_buf.as_mut_slice()[buffer.len() -
                                                       1..]
-                                                          .as_mut_ptr() as
+                                                              .as_mut_ptr() as
                                                       ffi::SQLPOINTER,
                                                       extra_space as ffi::SQLLEN,
                                                       null_mut());
@@ -190,8 +190,8 @@ impl Raii<ffi::Stmt> {
                             // No truncation. Warning may be due to some other issue.
                             Return::SuccessWithInfo(Some(from_utf8(&buffer[..(indicator as
                                                                        usize)])
-                                .unwrap()
-                                .to_owned()))
+                                                                 .unwrap()
+                                                                 .to_owned()))
                         }
                     }
                 }

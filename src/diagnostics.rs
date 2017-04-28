@@ -62,6 +62,37 @@ impl Error for DiagnosticRecord {
     }
 }
 
+pub fn get_diag_rec(handle_type: ffi::HandleType,
+                    handle: ffi::SQLHANDLE,
+                    record_number: i16)
+                    -> Option<DiagnosticRecord> {
+    let mut result = DiagnosticRecord::new();
+
+    match unsafe {
+              ffi::SQLGetDiagRec(handle_type,
+                                 handle,
+                                 record_number,
+                                 result.state.as_mut_ptr(),
+                                 &mut result.native_error as *mut ffi::SQLINTEGER,
+                                 result.message.as_mut_ptr(),
+                                 ffi::SQL_MAX_MESSAGE_LENGTH,
+                                 &mut result.message_length as *mut ffi::SQLSMALLINT)
+          } {
+        ffi::SQL_SUCCESS => Some(result),
+        ffi::SQL_NO_DATA => None,
+        ffi::SQL_SUCCESS_WITH_INFO => Some(result),
+        ffi::SQL_ERROR => {
+            if record_number > 0 {
+                panic!("SQLGetDiagRec returned SQL_ERROR")
+            } else {
+                panic!("record number start at 1 has been {}", record_number)
+            }
+        }
+        ffi::SQL_INVALID_HANDLE => panic!("invalid handle"),
+        res => panic!("SQLGetDiag returned unexpected result: {:?}", res),
+    }
+}
+
 /// Allows retriving a diagnostic record, describing errors (or lack thereof) during the last
 /// operation.
 pub trait GetDiagRec {
@@ -77,30 +108,9 @@ impl<H> GetDiagRec for H
           H::To: OdbcObject
 {
     fn get_diag_rec(&self, record_number: i16) -> Option<(DiagnosticRecord)> {
-        let mut result = DiagnosticRecord::new();
-
-        match unsafe {
-                  ffi::SQLGetDiagRec(H::To::handle_type(),
-                                     self.handle() as ffi::SQLHANDLE,
-                                     record_number,
-                                     result.state.as_mut_ptr(),
-                                     &mut result.native_error as *mut ffi::SQLINTEGER,
-                                     result.message.as_mut_ptr(),
-                                     ffi::SQL_MAX_MESSAGE_LENGTH,
-                                     &mut result.message_length as *mut ffi::SQLSMALLINT)
-              } {
-            ffi::SQL_SUCCESS => Some(result),
-            ffi::SQL_NO_DATA => None,
-            ffi::SQL_SUCCESS_WITH_INFO => Some(result),
-            ffi::SQL_ERROR => {
-                if record_number > 0 {
-                    panic!("SQLGetDiagRec returned SQL_ERROR")
-                } else {
-                    panic!("record number start at 1 has been {}", record_number)
-                }
-            }
-            _ => panic!("SQLGetDiag returned unexpected result"),
-        }
+        get_diag_rec(H::To::handle_type(),
+                     unsafe { self.handle() } as ffi::SQLHANDLE,
+                     record_number)
     }
 }
 
@@ -127,4 +137,3 @@ mod test {
                     Function sequence error");
     }
 }
-

@@ -45,6 +45,19 @@ pub use environment::*;
 pub use data_source::{DataSource, Connected, Disconnected};
 pub use statement::*;
 
+pub fn set_connection_pooling(cp_val: ffi::SqlCpAttrValue) -> Result<()> {
+    match unsafe {
+              ffi::SQLSetEnvAttr(null_mut(),
+                                 ffi::SQL_ATTR_CONNECTION_POOLING,
+                                 ::std::mem::transmute(cp_val as i64),
+                                 -1)
+          } {
+        ffi::SQL_SUCCESS |
+        ffi::SQL_SUCCESS_WITH_INFO => Ok(()),
+        _ => Err(diagnostics::get_diag_rec(ffi::SQL_HANDLE_ENV, null_mut(), 1).unwrap()),
+    }
+}
+
 /// Reflects the ability of a type to expose a valid handle
 pub trait Handle {
     type To;

@@ -66,7 +66,7 @@ impl Raii<ffi::Stmt> {
               T: ?Sized
     {
         match unsafe {
-            ffi::SQLBindParameter(
+                  ffi::SQLBindParameter(
                 self.handle(),
                 parameter_index,
                 ffi::SQL_PARAM_INPUT,
@@ -78,7 +78,7 @@ impl Raii<ffi::Stmt> {
                 0, // buffer length
                 &value.indicator() as * const ffi::SQLLEN as * mut ffi::SQLLEN// str len or ind ptr
             )
-        } {
+              } {
             ffi::SQL_SUCCESS => Return::Success(()),
             ffi::SQL_SUCCESS_WITH_INFO => Return::SuccessWithInfo(()),
             ffi::SQL_ERROR => Return::Error,
