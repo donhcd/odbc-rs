@@ -23,7 +23,10 @@ unsafe impl<'a, T> Output<'a> for T
 }
 
 impl Raii<ffi::Stmt> {
-    fn get_data<'a, T>(&mut self, col_or_param_num: u16, buffer: &'a mut Vec<u8>) -> Return<Option<T>>
+    fn get_data<'a, T>(&mut self,
+                       col_or_param_num: u16,
+                       buffer: &'a mut Vec<u8>)
+                       -> Return<Option<T>>
         where T: OdbcType<'a>
     {
         if buffer.len() == 0 {
@@ -47,16 +50,15 @@ impl Raii<ffi::Stmt> {
                         Return::Success(None)
                     } else {
                         let slice = &buffer[..(indicator as usize)];
-                        Return::Success(
-                            Some(
-                                T::convert(slice)
-                            )
-                        )
+                        Return::Success(Some(T::convert(slice)))
                     }
                 }
                 ffi::SQL_SUCCESS_WITH_INFO => {
                     if indicator == ffi::SQL_NO_TOTAL {
-                        Return::SuccessWithInfo(None)
+                        // FIXME(donhcd): this "handles" super long strings just by returning the
+                        // prefix and pretending that that is the full string
+                        let value = T::convert(buffer);
+                        Return::SuccessWithInfo(Some(value))
                     } else {
                         // Check if string has been truncated.
                         // String is also truncated if indicator is equal to BUF_LENGTH because of terminating nul
@@ -78,10 +80,9 @@ impl Raii<ffi::Stmt> {
                             let ret = ffi::SQLGetData(self.handle(),
                                                       col_or_param_num,
                                                       T::c_data_type(),
-                                                      buffer.as_mut_slice()[old_len -
-                                                          1..]
+                                                      buffer.as_mut_slice()[old_len - 1..]
                                                           .as_mut_ptr() as
-                                                          ffi::SQLPOINTER,
+                                                      ffi::SQLPOINTER,
                                                       extra_space as ffi::SQLLEN,
                                                       std::ptr::null_mut());
                             buffer.pop();
@@ -95,11 +96,7 @@ impl Raii<ffi::Stmt> {
                         } else {
                             let slice = &buffer[..(indicator as usize)];
                             // No truncation. Warning may be due to some other issue.
-                            Return::SuccessWithInfo(
-                                Some(
-                                    T::convert(slice)
-                                )
-                            )
+                            Return::SuccessWithInfo(Some(T::convert(slice)))
                         }
                     }
                 }
